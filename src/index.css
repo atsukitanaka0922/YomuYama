@@ -1,13 +1,158 @@
+/* src/index.css */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Roboto', 'Noto Sans JP', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f5f5f5;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* スクロールバーのスタイル */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bdbdbd;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9e9e9e;
+}
+
+/* リンクのスタイル */
+a {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 全体のコンテナのスタイル */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.content-container {
+  flex: 1;
+  padding-bottom: 2rem;
+}
+
+/* iOSのタップハイライトを無効化 */
+a,
+button,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safariのバグ修正: テキスト入力のズーム防止 */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* カード全体のスタイル */
+.book-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.book-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ステータスによる色分け */
+.status-unread {
+  border-left: 4px solid #f44336; /* 赤色 */
+}
+
+.status-reading {
+  border-left: 4px solid #ff9800; /* オレンジ色 */
+}
+
+.status-completed {
+  border-left: 4px solid #4caf50; /* 緑色 */
+}
+
+/* PWA用スタイル */
+@media (display-mode: standalone) {
+  /* スタンドアロンモード (PWA) 向けスタイル */
+  body {
+    overscroll-behavior: none; /* バウンス効果防止 */
+  }
+  
+  .pwa-header {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .pwa-content {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+  
+  .status-unread {
+    border-left-color: #ff6659; /* 暗いモード用の赤色 */
+  }
+  
+  .status-reading {
+    border-left-color: #ffac33; /* 暗いモード用のオレンジ色 */
+  }
+  
+  .status-completed {
+    border-left-color: #80e27e; /* 暗いモード用の緑色 */
+  }
 }

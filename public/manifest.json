@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "本の管理",
+  "name": "本の管理ツール",
+  "description": "あなたの本をシンプルかつ効率的に管理するツール",
   "icons": [
     {
       "src": "favicon.ico",
@@ -16,10 +17,38 @@
       "src": "logo512.png",
       "type": "image/png",
       "sizes": "512x512"
+    },
+    {
+      "src": "maskable_icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "categories": ["books", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "本の一覧を見る",
+      "short_name": "本の一覧",
+      "description": "登録した本の一覧を表示します",
+      "url": "/books"
+    },
+    {
+      "name": "本を追加する",
+      "short_name": "本を追加",
+      "description": "新しい本を登録します",
+      "url": "/books/add"
+    },
+    {
+      "name": "新刊スケジュール",
+      "short_name": "新刊",
+      "description": "予定されている新刊の情報を見る",
+      "url": "/releases"
+    }
+  ]
 }
