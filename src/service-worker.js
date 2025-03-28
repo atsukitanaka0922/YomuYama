@@ -69,6 +69,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
+        // eslint-disable-next-line no-undef
         return caches.match(workbox.precaching.getCacheKeyForURL('/index.html'));
       })
     );
@@ -100,6 +101,7 @@ self.addEventListener('notificationclick', (event) => {
   notification.close();
   
   event.waitUntil(
+    // eslint-disable-next-line no-undef
     clients.openWindow(url)
   );
 });
