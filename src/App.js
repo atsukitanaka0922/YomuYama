@@ -1,11 +1,18 @@
 // src/App.js
+/**
+ * アプリケーションのメインコンポーネント
+ * ルーティングやテーマ設定、認証プロバイダーを管理します
+ */
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
-// コンポーネント
+// 共通コンポーネント
 import Navbar from './components/Navbar';
+import PrivateRoute from './components/PrivateRoute';
+
+// ページコンポーネント
 import Home from './pages/Home';
 import BookList from './pages/BookList';
 import AddBook from './pages/AddBook';
@@ -14,31 +21,36 @@ import ReleaseSchedule from './pages/ReleaseSchedule';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import NotFound from './pages/NotFound';
-import PrivateRoute from './components/PrivateRoute';
 
-// 新しく追加したページ
+// シリーズ管理ページ
 import SeriesList from './pages/SeriesList';
 import SeriesDetails from './pages/SeriesDetails';
 import AddSeries from './pages/AddSeries';
+
+// 一括登録と統計機能
 import BulkAddBooks from './pages/BulkAddBooks';
 import BookTowerPage from './pages/BookTowerPage';
 
 // 認証コンテキスト
 import { AuthProvider } from './contexts/AuthContext';
 
+/**
+ * アプリケーション全体のテーマ設定
+ * ここで色やフォントなどのスタイルを定義します
+ */
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
+      main: '#1976d2', // メインカラー
     },
     secondary: {
-      main: '#f50057',
+      main: '#f50057', // アクセントカラー
     },
   },
   typography: {
     fontFamily: [
       'Roboto',
-      'Noto Sans JP',
+      'Noto Sans JP', // 日本語フォント
       'sans-serif',
     ].join(','),
   },
@@ -54,35 +66,38 @@ const theme = createTheme({
   },
 });
 
+/**
+ * アプリケーションのメインコンポーネント
+ * ルーティングの設定とテーマの適用を行います
+ */
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
+      <CssBaseline /> {/* リセットCSS */}
+      <AuthProvider> {/* 認証コンテキストプロバイダー */}
         <Router>
           <div className="app-container">
-            <Navbar />
+            <Navbar /> {/* ナビゲーションバー */}
             <div className="content-container">
               <Routes>
+                {/* 公開ページ */}
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-
-                {/* 本の管理ルート */}
+                
+                {/* 本の管理機能（要認証） */}
                 <Route path="/books" element={<PrivateRoute><BookList /></PrivateRoute>} />
                 <Route path="/books/add" element={<PrivateRoute><AddBook /></PrivateRoute>} />
                 <Route path="/books/:id" element={<PrivateRoute><BookDetails /></PrivateRoute>} />
                 <Route path="/releases" element={<PrivateRoute><ReleaseSchedule /></PrivateRoute>} />
                 
-                {/* シリーズ管理ルート（新規追加） */}
+                {/* シリーズ管理機能（要認証） */}
                 <Route path="/series" element={<PrivateRoute><SeriesList /></PrivateRoute>} />
                 <Route path="/series/add" element={<PrivateRoute><AddSeries /></PrivateRoute>} />
                 <Route path="/series/:id" element={<PrivateRoute><SeriesDetails /></PrivateRoute>} />
                 
-                {/* 一括登録ルート（新規追加） */}
+                {/* 拡張機能（要認証） */}
                 <Route path="/books/bulk-add" element={<PrivateRoute><BulkAddBooks /></PrivateRoute>} />
-                
-                {/* 読書タワールート（新規追加） */}
                 <Route path="/book-tower" element={<PrivateRoute><BookTowerPage /></PrivateRoute>} />
                 
                 {/* 404ページ */}
