@@ -73,10 +73,10 @@ const Home = () => {
           <Grid container spacing={4} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h2" component="h1" gutterBottom>
-                シンプルな本の管理アプリ
+                YomuYama
               </Typography>
               <Typography variant="h5" paragraph>
-                読書を楽しく、新刊の発売日も逃さない、あなたのための本棚アプリ
+                読まない本の山から読み切った本の山へ...
               </Typography>
               {currentUser ? (
                 <Button
@@ -217,7 +217,6 @@ const Home = () => {
           </Typography>
           <Typography variant="h6" align="center" color="text.secondary" paragraph>
             無料でどこからでもアクセスできます。PCでもスマホでも使える便利なツールです。
-            読まない本の山から読み切った本の山へ...
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
             {currentUser ? (
