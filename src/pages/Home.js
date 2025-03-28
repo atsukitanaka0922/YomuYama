@@ -159,7 +159,7 @@ const Home = () => {
           paragraph
           sx={{ mb: 6 }}
         >
-          「本の管理ツール」は読書好きのために作られた、シンプルで使いやすいアプリです。
+          「YomuYama」は読書好きのために作られた、シンプルで使いやすいアプリです。
         </Typography>
 
         <Grid container spacing={4}>
@@ -213,10 +213,11 @@ const Home = () => {
       >
         <Container maxWidth="md">
           <Typography variant="h4" align="center" gutterBottom>
-            今すぐ本の管理を始めましょう
+            本の山を積み始めましょう
           </Typography>
           <Typography variant="h6" align="center" color="text.secondary" paragraph>
             無料でどこからでもアクセスできます。PCでもスマホでも使える便利なツールです。
+            読まない本の山から読み切った本の山へ...
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
             {currentUser ? (
@@ -248,7 +249,7 @@ const Home = () => {
       <Box component="footer" sx={{ bgcolor: 'grey.200', py: 3 }}>
         <Container maxWidth="lg">
           <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} 本の管理ツール
+            © {new Date().getFullYear()} YomuYama
           </Typography>
         </Container>
       </Box>
