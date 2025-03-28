@@ -1,70 +1,162 @@
-# Getting Started with Create React App
+# YomuYama
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+本の管理、シリーズの整理、読書進捗の追跡などを行うためのReactウェブアプリケーションです。PCとスマートフォンの両方で使用できるPWA（Progressive Web App）として実装されています。
 
-## Available Scripts
+## 機能
 
-In the project directory, you can run:
+- **本の管理**
+  - 本の追加、編集、削除
+  - Google Books APIを使った本の検索
+  - 本の詳細情報の表示
+  - 読書状態の追跡（未読、読書中、完読）
 
-### `npm start`
+- **シリーズ管理**
+  - シリーズの作成と管理
+  - シリーズ内の本の整理
+  - シリーズの収集進捗表示
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **新刊情報**
+  - 新刊の発売日追跡
+  - 近日発売の本の通知
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **便利な機能**
+  - 複数の本をまとめて追加
+  - 本の検索とフィルタリング
+  - 読書統計（読書タワー）
+  - カスタムカテゴリー設定
 
-### `npm test`
+## 技術スタック
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **フロントエンド**：React.js、Material-UI
+- **バックエンド**：Firebase（認証、Firestore）
+- **API**：Google Books API
+- **PWA対応**：Service Worker、オフラインサポート
+- **アニメーション**：Framer Motion
 
-### `npm run build`
+## インストールと実行
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### 前提条件
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js (v14 以上)
+- npm または yarn
+- Firebaseアカウント
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### セットアップ手順
 
-### `npm run eject`
+1. リポジトリのクローン
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+git clone https://github.com/yourusername/book-manager.git
+cd book-manager
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+2. 依存パッケージのインストール
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+npm install
+# または
+yarn install
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+3. Firebaseの設定
 
-## Learn More
+- Firebaseコンソールでプロジェクトを作成
+- Webアプリを追加して設定情報を取得
+- `src/firebase.js` に設定情報を追加
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```javascript
+// src/firebase.js
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 
-### Code Splitting
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+export { db, auth };
+```
 
-### Analyzing the Bundle Size
+4. 開発サーバーの起動
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```bash
+npm start
+# または
+yarn start
+```
 
-### Making a Progressive Web App
+5. ビルドと本番環境へのデプロイ
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```bash
+npm run build
+# または
+yarn build
+```
 
-### Advanced Configuration
+## プロジェクト構造
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```
+src/
+├── api/                 # API関連のコード
+├── components/          # 再利用可能なコンポーネント
+├── contexts/            # コンテキストプロバイダー
+├── pages/               # ページコンポーネント
+├── utils/               # ユーティリティ関数
+├── App.js               # アプリのメインコンポーネント
+├── firebase.js          # Firebase設定
+├── index.js             # エントリーポイント
+└── index.css            # グローバルスタイル
+```
 
-### Deployment
+## 主な機能の説明
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### 1. 本の管理
 
-### `npm run build` fails to minify
+本のタイトル、著者、出版日などの基本情報を登録できます。Google Books APIを使って書籍情報を検索・取得することも可能です。各本には読書状態（未読、読書中、完読）を設定できます。
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+### 2. シリーズ管理
+
+複数の本をシリーズとしてグループ化できます。シリーズページでは収集進捗を視覚的に確認できます。シリーズの全巻数を設定することで、収集の完了度を把握できます。
+
+### 3. 新刊スケジュール
+
+続刊の発売日を記録し、発売日が近づくとアプリ内で通知を受け取ることができます。近日発売の本をまとめて表示するビューもあります。
+
+### 4. 読書タワー
+
+未読の本と完読した本をタワー状に積み上げて視覚化します。全体の高さや読了ページ数など、読書の進捗を別の視点から把握できます。
+
+## 貢献方法
+
+1. このリポジトリをフォーク
+2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Requestを作成
+
+## ライセンス
+
+[MIT License](LICENSE)
+
+## 謝辞
+
+- [Google Books API](https://developers.google.com/books) - 書籍情報の取得に使用
+- [Material-UI](https://mui.com/) - UIコンポーネント
+- [Firebase](https://firebase.google.com/) - バックエンドサービス
+- [Framer Motion](https://www.framer.com/motion/) - アニメーション
+
+---
+v1.0.0 YomuYamaの正式リリース
+---
+
+作成者: 田中 敦喜  
+連絡先: atsuki7660@gmail.com
