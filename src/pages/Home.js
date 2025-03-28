@@ -117,16 +117,31 @@ const Home = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <Box
-                component="img"
-                src="https://source.unsplash.com/random/600x400/?books,library"
-                alt="本の画像"
                 sx={{
                   width: '100%',
                   height: 'auto',
                   borderRadius: 2,
-                  boxShadow: 3
+                  boxShadow: 3,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  minHeight: 400
                 }}
-              />
+              >
+                <Box
+                  component="img"
+                  src="/images/book-library.jpg"
+                  alt="本棚のイメージ"
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                  onError={(e) => {
+                    // 画像が読み込めない場合はフォールバック
+                    e.target.src = 'https://images.pexels.com/photos/1370295/pexels-photo-1370295.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2';
+                  }}
+                />
+              </Box>
             </Grid>
           </Grid>
         </Container>
