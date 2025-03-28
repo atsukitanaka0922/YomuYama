@@ -179,7 +179,7 @@ const Navbar = () => {
             }}
           >
             <BookIcon sx={{ mr: 1 }} />
-            本の管理ツール
+            YomuYama
           </Typography>
           
           {!isMobile && (
