@@ -1,8 +1,8 @@
 // src/pages/AddBook.js
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import BookSearch from '../components/BookSearch';
 
@@ -33,11 +33,13 @@ import {
 
 const AddBook = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [openSearchDialog, setOpenSearchDialog] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // フォームの状態
   const [formData, setFormData] = useState({
@@ -60,6 +62,45 @@ const AddBook = () => {
       notificationEnabled: false,
     }
   });
+  
+  // 編集モードの場合、既存の本のデータを取得
+  useEffect(() => {
+    const fetchBookData = async () => {
+      if (id && currentUser) {
+        try {
+          setLoading(true);
+          setIsEditMode(true);
+          
+          const bookRef = doc(db, 'users', currentUser.uid, 'books', id);
+          const bookSnap = await getDoc(bookRef);
+          
+          if (bookSnap.exists()) {
+            const bookData = bookSnap.data();
+            setFormData({
+              ...bookData,
+              categoryInput: '',
+              publishedDate: bookData.publishedDate || '',
+              releaseSchedule: {
+                nextVolume: bookData.releaseSchedule?.nextVolume || '',
+                expectedReleaseDate: bookData.releaseSchedule?.expectedReleaseDate || '',
+                notificationEnabled: bookData.releaseSchedule?.notificationEnabled || false
+              }
+            });
+          } else {
+            setError('本が見つかりませんでした');
+            navigate('/books');
+          }
+        } catch (error) {
+          console.error('本のデータ取得エラー:', error);
+          setError('本の情報取得中にエラーが発生しました');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchBookData();
+  }, [id, currentUser, navigate]);
 
   // 入力フィールドの変更ハンドラ
   const handleChange = (e) => {
@@ -144,30 +185,39 @@ const AddBook = () => {
       const today = new Date().toISOString().split('T')[0];
       const bookData = {
         ...formData,
-        addedDate: today,
         lastModified: today,
         releaseSchedule: {
           ...formData.releaseSchedule,
           notificationEnabled: Boolean(formData.releaseSchedule.notificationEnabled),
         },
-        createdAt: serverTimestamp(),
       };
       
       // categoryInputはFirestoreに保存しない
       delete bookData.categoryInput;
       
-      // Firestoreに追加
-      await addDoc(collection(db, 'users', currentUser.uid, 'books'), bookData);
-      
-      setSuccess(true);
-      // 成功メッセージを表示した後、リストページにリダイレクト
-      setTimeout(() => {
-        navigate('/books');
-      }, 2000);
+      if (isEditMode) {
+        // 既存の本を更新
+        const bookRef = doc(db, 'users', currentUser.uid, 'books', id);
+        await updateDoc(bookRef, bookData);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate(`/books/${id}`);
+        }, 2000);
+      } else {
+        // 新しい本を追加
+        bookData.addedDate = today;
+        bookData.createdAt = serverTimestamp();
+        
+        const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'books'), bookData);
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/books');
+        }, 2000);
+      }
       
     } catch (error) {
-      console.error('本の追加エラー:', error);
-      setError('本の追加中にエラーが発生しました');
+      console.error(isEditMode ? '本の更新エラー:' : '本の追加エラー:', error);
+      setError(isEditMode ? '本の更新中にエラーが発生しました' : '本の追加中にエラーが発生しました');
     } finally {
       setLoading(false);
     }
@@ -201,26 +251,28 @@ const AddBook = () => {
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          本を追加
+          {isEditMode ? '本を編集' : '本を追加'}
         </Typography>
         
-        {/* 検索ボタン */}
-        <Button
-          variant="contained"
-          startIcon={<SearchIcon />}
-          onClick={handleOpenSearchDialog}
-          sx={{ mb: 3 }}
-        >
-          本を検索
-        </Button>
+        {/* 検索ボタン (編集モードでは非表示) */}
+        {!isEditMode && (
+          <Button
+            variant="contained"
+            startIcon={<SearchIcon />}
+            onClick={handleOpenSearchDialog}
+            sx={{ mb: 3 }}
+          >
+            本を検索
+          </Button>
+        )}
         
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
-        
-        <form onSubmit={handleSubmit}>
+
+<form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <TextField
@@ -380,7 +432,7 @@ const AddBook = () => {
                 onChange={handleChange}
               />
             </Grid>
-            
+
             {/* 新刊スケジュール情報 */}
             <Grid item xs={12}>
               <Divider sx={{ my: 1 }} />
@@ -422,7 +474,7 @@ const AddBook = () => {
                 </Select>
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
@@ -432,7 +484,7 @@ const AddBook = () => {
                   disabled={loading}
                   sx={{ flexGrow: 1 }}
                 >
-                  {loading ? '保存中...' : '保存'}
+                  {loading ? '保存中...' : isEditMode ? '更新' : '保存'}
                 </Button>
                 <Button
                   variant="outlined"
@@ -466,7 +518,7 @@ const AddBook = () => {
           onClose={() => setSuccess(false)}
         >
           <Alert severity="success" sx={{ width: '100%' }}>
-            本が正常に追加されました！
+            {isEditMode ? '本が正常に更新されました！' : '本が正常に追加されました！'}
           </Alert>
         </Snackbar>
       </Paper>

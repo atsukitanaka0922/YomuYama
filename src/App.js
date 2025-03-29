@@ -79,30 +79,31 @@ function App() {
           <div className="app-container">
             <Navbar /> {/* ナビゲーションバー */}
             <div className="content-container">
-              <Routes>
-                {/* 公開ページ */}
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                
-                {/* 本の管理機能（要認証） */}
-                <Route path="/books" element={<PrivateRoute><BookList /></PrivateRoute>} />
-                <Route path="/books/add" element={<PrivateRoute><AddBook /></PrivateRoute>} />
-                <Route path="/books/:id" element={<PrivateRoute><BookDetails /></PrivateRoute>} />
-                <Route path="/releases" element={<PrivateRoute><ReleaseSchedule /></PrivateRoute>} />
-                
-                {/* シリーズ管理機能（要認証） */}
-                <Route path="/series" element={<PrivateRoute><SeriesList /></PrivateRoute>} />
-                <Route path="/series/add" element={<PrivateRoute><AddSeries /></PrivateRoute>} />
-                <Route path="/series/:id" element={<PrivateRoute><SeriesDetails /></PrivateRoute>} />
-                
-                {/* 拡張機能（要認証） */}
-                <Route path="/books/bulk-add" element={<PrivateRoute><BulkAddBooks /></PrivateRoute>} />
-                <Route path="/book-tower" element={<PrivateRoute><BookTowerPage /></PrivateRoute>} />
-                
-                {/* 404ページ */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+            <Routes>
+              {/* 公開ページ */}
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              
+              {/* 本の管理機能（要認証） */}
+              <Route path="/books" element={<PrivateRoute><BookList /></PrivateRoute>} />
+              <Route path="/books/add" element={<PrivateRoute><AddBook /></PrivateRoute>} />
+              <Route path="/books/:id" element={<PrivateRoute><BookDetails /></PrivateRoute>} />
+              <Route path="/books/edit/:id" element={<PrivateRoute><AddBook /></PrivateRoute>} />
+              <Route path="/releases" element={<PrivateRoute><ReleaseSchedule /></PrivateRoute>} />
+              
+              {/* シリーズ管理機能（要認証） */}
+              <Route path="/series" element={<PrivateRoute><SeriesList /></PrivateRoute>} />
+              <Route path="/series/add" element={<PrivateRoute><AddSeries /></PrivateRoute>} />
+              <Route path="/series/:id" element={<PrivateRoute><SeriesDetails /></PrivateRoute>} />
+              
+              {/* 拡張機能（要認証） */}
+              <Route path="/books/bulk-add" element={<PrivateRoute><BulkAddBooks /></PrivateRoute>} />
+              <Route path="/book-tower" element={<PrivateRoute><BookTowerPage /></PrivateRoute>} />
+              
+              {/* 404ページ */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
             </div>
           </div>
         </Router>
