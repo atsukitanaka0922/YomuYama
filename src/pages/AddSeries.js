@@ -159,6 +159,7 @@ const AddSeries = () => {
       const seriesData = {
         ...formData,
         books: selectedBooks,
+        bookCount: formData.bookCount ? parseInt(formData.bookCount, 10) : null,
         createdAt: serverTimestamp(),
         addedDate: today,
         lastModified: today

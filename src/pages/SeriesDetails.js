@@ -128,7 +128,13 @@ const SeriesDetails = () => {
         const bookRef = doc(db, 'users', currentUser.uid, 'books', bookId);
         const bookSnap = await getDoc(bookRef);
         if (bookSnap.exists()) {
-          booksData.push({ id: bookSnap.id, ...bookSnap.data() });
+          // 本の所持状態を取得（新しいデータ構造の場合）
+          const owned = series?.bookStatus?.[bookId]?.owned ?? true; // デフォルトで所持している
+          booksData.push({ 
+            id: bookSnap.id, 
+            ...bookSnap.data(),
+            owned: owned
+          });
         }
       }
       
@@ -259,22 +265,41 @@ const SeriesDetails = () => {
   };
 
   // シリーズに本を追加
-  const handleAddBooksToSeries = async (selectedBookIds) => {
+  const handleAddBooksToSeries = async (selectedBookIds, allOwned = true) => {
     if (!selectedBookIds.length) return;
     
     try {
       const seriesRef = doc(db, 'users', currentUser.uid, 'series', id);
       
-      // 新しい本のIDを配列に追加
+      // 所持状態を設定（デフォルトはallOwnedパラメータによって決まる）
+      const newBooksWithStatus = {};
+      selectedBookIds.forEach(bookId => {
+        newBooksWithStatus[bookId] = { owned: allOwned };
+      });
+      
+      // 新しい本のIDと所持状態をマージ
+      const updatedBooks = { ...(series.bookStatus || {}) };
+      
+      // 新しい本の情報を追加
+      Object.entries(newBooksWithStatus).forEach(([bookId, status]) => {
+        updatedBooks[bookId] = status;
+      });
+      
+      // IDだけの配列も維持（下位互換性のため）
       const updatedBookIds = [...(series.books || []), ...selectedBookIds];
       
       await updateDoc(seriesRef, {
         books: updatedBookIds,
+        bookStatus: updatedBooks,
         lastModified: new Date().toISOString().split('T')[0],
       });
       
       // ステートを更新
-      const updatedSeries = { ...series, books: updatedBookIds };
+      const updatedSeries = { 
+        ...series, 
+        books: updatedBookIds,
+        bookStatus: updatedBooks
+      };
       setSeries(updatedSeries);
       setEditedSeries(updatedSeries);
       
@@ -343,7 +368,62 @@ const SeriesDetails = () => {
   // 進捗率を計算
   const calculateProgress = () => {
     if (!series || !series.bookCount || series.bookCount === 0) return 0;
-    return (series.books?.length || 0) / series.bookCount * 100;
+    
+    // 所持している本の数を計算
+    let ownedBooksCount = 0;
+    
+    // 新しいデータ構造（bookStatus オブジェクト）がある場合はそれを使用
+    if (series.bookStatus) {
+      ownedBooksCount = Object.values(series.bookStatus).filter(status => status.owned).length;
+    } else {
+      // 下位互換性のため、古いデータ構造ではすべての本を所持していると仮定
+      ownedBooksCount = series.books?.length || 0;
+    }
+    
+    return (ownedBooksCount / series.bookCount) * 100;
+  };
+
+  // 本の所持状態を切り替える
+  const toggleBookOwned = async (bookId, currentOwned) => {
+    try {
+      const newOwned = !currentOwned;
+      const seriesRef = doc(db, 'users', currentUser.uid, 'series', id);
+      
+      // 現在の所持状態を取得
+      const bookStatus = { ...(series.bookStatus || {}) };
+      
+      // 該当の本の所持状態を更新
+      bookStatus[bookId] = { 
+        ...(bookStatus[bookId] || {}),
+        owned: newOwned 
+      };
+      
+      // Firestore更新
+      await updateDoc(seriesRef, {
+        bookStatus: bookStatus,
+        lastModified: new Date().toISOString().split('T')[0],
+      });
+      
+      // ローカル状態も更新
+      setSeries(prev => ({
+        ...prev,
+        bookStatus: bookStatus
+      }));
+      
+      // 本のリストも更新
+      setSeriesBooks(prev => 
+        prev.map(book => 
+          book.id === bookId 
+            ? { ...book, owned: newOwned } 
+            : book
+        )
+      );
+      
+      setSuccessMessage(newOwned ? '本を所持済みにしました' : '本を未所持にしました');
+    } catch (error) {
+      console.error('本の所持状態更新エラー:', error);
+      setError('本の所持状態の更新中にエラーが発生しました');
+    }
   };
 
   // 編集モードのキャンセル
@@ -618,7 +698,11 @@ const SeriesDetails = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                       <Typography variant="subtitle1">収集進捗</Typography>
                       <Typography variant="body2">
-                        {series.books?.length || 0} / {series.bookCount || '?'} 巻
+                        {
+                          series.bookStatus 
+                            ? Object.values(series.bookStatus).filter(status => status.owned).length 
+                            : (series.books?.length || 0)
+                        } / {series.bookCount || '?'} 巻
                         {series.bookCount && ` (${Math.round(calculateProgress())}%)`}
                       </Typography>
                     </Box>
@@ -672,13 +756,24 @@ const SeriesDetails = () => {
                     <ListItem
                       alignItems="flex-start"
                       secondaryAction={
-                        <Button
-                          color="error"
-                          size="small"
-                          onClick={() => handleRemoveBookFromSeries(book.id)}
-                        >
-                          削除
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant={book.owned ? "outlined" : "contained"}
+                            color={book.owned ? "success" : "primary"}
+                            size="small"
+                            onClick={() => toggleBookOwned(book.id, book.owned)}
+                            sx={{ minWidth: '90px' }}
+                          >
+                            {book.owned ? '所持済み' : '未所持'}
+                          </Button>
+                          <Button
+                            color="error"
+                            size="small"
+                            onClick={() => handleRemoveBookFromSeries(book.id)}
+                          >
+                            削除
+                          </Button>
+                        </Box>
                       }
                     >
                       <ListItemAvatar>
@@ -755,7 +850,7 @@ const SeriesDetails = () => {
                 <br />
                 ※シリーズを削除しても、登録されている本自体は削除されません。
               </DialogContentText>
-            </DialogContent>
+              </DialogContent>
             <DialogActions>
               <Button onClick={() => setOpenDeleteDialog(false)}>キャンセル</Button>
               <Button onClick={handleDeleteSeries} color="error">
@@ -824,6 +919,7 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
   const [selectedBooks, setSelectedBooks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredBooks, setFilteredBooks] = useState(books);
+  const [allOwned, setAllOwned] = useState(true); // デフォルトで所持済みに設定
   
   // 検索フィルター
   useEffect(() => {
@@ -864,9 +960,21 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
         }}
       />
       
-      <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-        追加する本を選択 ({selectedBooks.length} 選択中)
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 1 }}>
+        <Typography variant="subtitle2">
+          追加する本を選択 ({selectedBooks.length} 選択中)
+        </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={allOwned}
+              onChange={(e) => setAllOwned(e.target.checked)}
+              color="primary"
+            />
+          }
+          label="所持済みとして追加"
+        />
+      </Box>
       
       <List sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
         {filteredBooks.length === 0 ? (
@@ -912,7 +1020,7 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
         </Button>
         <Button
           variant="contained"
-          onClick={() => onAdd(selectedBooks)}
+          onClick={() => onAdd(selectedBooks, allOwned)}
           disabled={selectedBooks.length === 0}
         >
           選択した本を追加

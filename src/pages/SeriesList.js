@@ -92,7 +92,19 @@ const SeriesList = () => {
   // 進捗率を計算
   const calculateProgress = (seriesItem) => {
     if (!seriesItem.bookCount || seriesItem.bookCount === 0) return 0;
-    return (seriesItem.books?.length || 0) / seriesItem.bookCount * 100;
+    
+    // 所持している本の数を計算
+    let ownedBooksCount = 0;
+    
+    // 新しいデータ構造（bookStatus オブジェクト）がある場合はそれを使用
+    if (seriesItem.bookStatus) {
+      ownedBooksCount = Object.values(seriesItem.bookStatus).filter(status => status.owned).length;
+    } else {
+      // 下位互換性のため、古いデータ構造ではすべての本を所持していると仮定
+      ownedBooksCount = seriesItem.books?.length || 0;
+    }
+    
+    return (ownedBooksCount / seriesItem.bookCount) * 100;
   };
 
   if (loading) {
@@ -191,7 +203,11 @@ const SeriesList = () => {
                           収集進捗
                         </Typography>
                         <Typography variant="body2">
-                          {seriesItem.books?.length || 0} / {seriesItem.bookCount || '?'}
+                          {
+                            seriesItem.bookStatus 
+                              ? Object.values(seriesItem.bookStatus).filter(status => status.owned).length 
+                              : (seriesItem.books?.length || 0)
+                          } / {seriesItem.bookCount || '?'}
                         </Typography>
                       </Box>
                       <LinearProgress 
