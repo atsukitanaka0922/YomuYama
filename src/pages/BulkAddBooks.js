@@ -14,7 +14,11 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { searchBooksByTitle, searchBooksByAuthor } from '../api/googleBooksApi';
+import { 
+  searchBooksByTitle, 
+  searchBooksByAuthor, 
+  API_SOURCES 
+} from '../api/bookApiClient';
 
 // Material-UI
 import {
@@ -92,6 +96,8 @@ const BulkAddBooks = () => {
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
   const [defaultStatus, setDefaultStatus] = useState('unread');
   const [sortOrder, setSortOrder] = useState('newest'); // デフォルトで発売順
+  const [displayLimit, setDisplayLimit] = useState(20); // デフォルト表示数
+  const [apiSource, setApiSource] = useState(API_SOURCES.GOOGLE_BOOKS); // デフォルトAPIソース
 
   // シリーズ一覧を取得
   useEffect(() => {
@@ -120,9 +126,19 @@ const BulkAddBooks = () => {
   // ステップの定義
   const steps = ['本を検索', '詳細設定', '確認と保存'];
 
-  // sortOrderの状態変更ハンドラを追加
+  // sortOrderの状態変更ハンドラ
   const handleSortOrderChange = (e) => {
     setSortOrder(e.target.value);
+  };
+
+  // 表示数変更ハンドラ
+  const handleDisplayLimitChange = (e) => {
+    setDisplayLimit(Number(e.target.value));
+  };
+
+  // APIソース変更ハンドラ
+  const handleApiSourceChange = (e) => {
+    setApiSource(e.target.value);
   };
 
   // 本の検索
@@ -139,9 +155,9 @@ const BulkAddBooks = () => {
       let results;
       
       if (searchType === 'title') {
-        results = await searchBooksByTitle(searchTerm, 20, sortOrder);
+        results = await searchBooksByTitle(searchTerm, displayLimit, sortOrder, apiSource);
       } else {
-        results = await searchBooksByAuthor(searchTerm, 20, sortOrder);
+        results = await searchBooksByAuthor(searchTerm, displayLimit, sortOrder, apiSource);
       }
       
       setSearchResults(results);
@@ -296,12 +312,38 @@ const BulkAddBooks = () => {
         const seriesSnap = await getDoc(seriesRef);
         
         if (seriesSnap.exists()) {
-          const currentBooks = seriesSnap.data().books || [];
+          const seriesData = seriesSnap.data();
+          const currentBooks = seriesData.books || [];
+          const bookStatus = seriesData.bookStatus || {};
           
-          await updateDoc(seriesRef, {
-            books: [...currentBooks, ...bookIds],
-            lastModified: today
+          // 新しい本の所持状態をデフォルトで所持済みに設定
+          bookIds.forEach(bookId => {
+            bookStatus[bookId] = { owned: true };
           });
+          
+          // 更新データを準備
+          const updateData = {
+            books: [...currentBooks, ...bookIds],
+            bookStatus: bookStatus,
+            lastModified: today
+          };
+          
+          // シリーズの全巻数が設定されている場合、コンプリート状態を自動更新
+          if (seriesData.bookCount && seriesData.bookCount > 0) {
+            const totalOwnedBooks = Object.values(bookStatus).filter(status => status.owned).length;
+            
+            // 所持している本が全巻数以上ならコンプリート状態に
+            if (totalOwnedBooks >= seriesData.bookCount) {
+              updateData.completeStatus = true;
+            }
+          }
+          
+          // 新規シリーズを作成した場合は自動的に全ての本をコンプリート済みに
+          if (createNewSeries && bookIds.length >= selectedBooks.length) {
+            updateData.completeStatus = true;
+          }
+          
+          await updateDoc(seriesRef, updateData);
         }
       }
       
@@ -400,6 +442,37 @@ const BulkAddBooks = () => {
                 </Grid>
                 <Grid item xs={12} sm={2}>
                   <FormControl fullWidth>
+                    <InputLabel>検索API</InputLabel>
+                    <Select
+                      value={apiSource}
+                      label="検索API"
+                      onChange={handleApiSourceChange}
+                    >
+                      <MenuItem value={API_SOURCES.GOOGLE_BOOKS}>Google Books</MenuItem>
+                      <MenuItem value={API_SOURCES.NDL}>国会図書館</MenuItem>
+                      <MenuItem value={API_SOURCES.ALL}>全てのAPI</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={2}>
+                  <FormControl fullWidth>
+                    <InputLabel>表示件数</InputLabel>
+                    <Select
+                      value={displayLimit}
+                      label="表示件数"
+                      onChange={handleDisplayLimitChange}
+                    >
+                      <MenuItem value={20}>20件</MenuItem>
+                      <MenuItem value={30}>30件</MenuItem>
+                      <MenuItem value={40}>40件</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2} alignItems="center" sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={4}>
+                  <FormControl fullWidth>
                     <InputLabel>並び順</InputLabel>
                     <Select
                       value={sortOrder}
@@ -472,6 +545,10 @@ const BulkAddBooks = () => {
                                 出版: {book.publishedDate}
                               </Typography>
                             )}
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {book.apiSource === API_SOURCES.GOOGLE_BOOKS ? 'Google Books' : 
+                              book.apiSource === API_SOURCES.NDL ? '国会図書館' : ''}
+                            </Typography>
                           </CardContent>
                           <Box sx={{ p: 1, pt: 0 }}>
                             <Button

@@ -1,5 +1,5 @@
 // src/components/BookSearch.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -34,7 +34,12 @@ import {
   Clear as ClearIcon,
   Sort as SortIcon
 } from '@mui/icons-material';
-import { searchBooksByTitle, searchBooksByAuthor, fetchBookByISBN } from '../api/googleBooksApi';
+import {
+  searchBooksByTitle,
+  searchBooksByAuthor,
+  fetchBookByISBN,
+  API_SOURCES
+} from '../api/bookApiClient';
 
 // タブパネル用のコンポーネント
 function TabPanel(props) {
@@ -66,6 +71,8 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sortOrder, setSortOrder] = useState('newest'); // デフォルトで発売順
+  const [maxResults, setMaxResults] = useState(20); // デフォルトの検索結果数
+  const [apiSource, setApiSource] = useState(API_SOURCES.GOOGLE_BOOKS); // デフォルトAPIソース
 
   // タブ変更ハンドラ
   const handleTabChange = (event, newValue) => {
@@ -79,6 +86,16 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setSortOrder(event.target.value);
   };
 
+  // 検索結果数変更ハンドラ
+  const handleMaxResultsChange = (event) => {
+    setMaxResults(event.target.value);
+  };
+
+  // APIソース変更ハンドラ
+  const handleApiSourceChange = (event) => {
+    setApiSource(event.target.value);
+  };
+
   // タイトル検索
   const handleTitleSearch = async () => {
     if (!titleSearch.trim()) {
@@ -90,7 +107,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
-      const results = await searchBooksByTitle(titleSearch, 20, sortOrder);
+      const results = await searchBooksByTitle(titleSearch, maxResults, sortOrder, apiSource);
       setSearchResults(results);
       
       if (results.length === 0) {
@@ -115,7 +132,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
-      const results = await searchBooksByAuthor(authorSearch, 20, sortOrder);
+      const results = await searchBooksByAuthor(authorSearch, maxResults, sortOrder, apiSource);
       setSearchResults(results);
       
       if (results.length === 0) {
@@ -140,7 +157,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
-      const result = await fetchBookByISBN(isbnSearch);
+      const result = await fetchBookByISBN(isbnSearch, apiSource);
       
       if (result) {
         setSearchResults([result]);
@@ -220,8 +237,37 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
           <Tab label="ISBNで検索" />
         </Tabs>
 
-        {/* 並び順選択 */}
+        {/* 検索オプション */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 150, mr: 2 }}>
+            <InputLabel id="api-source-label">検索API</InputLabel>
+            <Select
+              labelId="api-source-label"
+              value={apiSource}
+              label="検索API"
+              onChange={handleApiSourceChange}
+            >
+              <MenuItem value={API_SOURCES.GOOGLE_BOOKS}>Google Books</MenuItem>
+              <MenuItem value={API_SOURCES.NDL}>国会図書館</MenuItem>
+              <MenuItem value={API_SOURCES.ALL}>全てのAPI</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <FormControl size="small" sx={{ minWidth: 120, mr: 2 }}>
+            <InputLabel id="max-results-label">表示件数</InputLabel>
+            <Select
+              labelId="max-results-label"
+              value={maxResults}
+              label="表示件数"
+              onChange={handleMaxResultsChange}
+              disabled={tabValue === 2} // ISBN検索では表示件数無効
+            >
+              <MenuItem value={20}>20件</MenuItem>
+              <MenuItem value={30}>30件</MenuItem>
+              <MenuItem value={40}>40件</MenuItem>
+            </Select>
+          </FormControl>
+          
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel id="sort-order-label">並び順</InputLabel>
             <Select
@@ -379,6 +425,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
                             <Typography variant="body2" color="text.secondary" gutterBottom>
                               出版社: {book.publisher || '不明'} 
                               {book.publishedDate && ` (${formatPublishedDate(book.publishedDate)})`}
+                              {book.apiSource && ` - ${book.apiSource === API_SOURCES.GOOGLE_BOOKS ? 'Google Books' : '国会図書館'}`}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" gutterBottom>
                               ISBN: {book.isbn13 || book.isbn10 || '不明'}

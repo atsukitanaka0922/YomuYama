@@ -10,7 +10,6 @@ import {
   updateDoc, 
   deleteDoc, 
   query, 
-  where, 
   arrayRemove,
   arrayUnion
 } from 'firebase/firestore';
@@ -49,7 +48,11 @@ import {
   Snackbar,
   Alert,
   Tooltip,
-  Checkbox
+  Checkbox,
+  Menu,
+  FormControl,
+  InputLabel,
+  Select
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -64,7 +67,10 @@ import {
   Search as SearchIcon,
   Info as InfoIcon,
   Language as LanguageIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 
 const SeriesDetails = () => {
@@ -82,6 +88,9 @@ const SeriesDetails = () => {
   const [openAddBookDialog, setOpenAddBookDialog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedSeries, setEditedSeries] = useState(null);
+  const [sortMethod, setSortMethod] = useState('volume'); // デフォルトは巻数順
+  const [sortMenuAnchor, setSortMenuAnchor] = useState(null);
+  const sortMenuOpen = Boolean(sortMenuAnchor);
 
   // シリーズ情報を取得
   useEffect(() => {
@@ -138,12 +147,8 @@ const SeriesDetails = () => {
         }
       }
       
-      // 巻数で並べ替え（タイトルから巻数を抽出）
-      booksData.sort((a, b) => {
-        const volA = extractVolumeNumber(a.title);
-        const volB = extractVolumeNumber(b.title);
-        return volA - volB;
-      });
+      // 本を指定された順序でソート
+      sortBooks(booksData, sortMethod);
       
       setSeriesBooks(booksData);
       
@@ -156,7 +161,7 @@ const SeriesDetails = () => {
       setLoadingBooks(false);
     }
   };
-  
+
   // タイトルから巻数を抽出する関数
   const extractVolumeNumber = (title) => {
     // "巻" や "Volume" などの前の数字を抽出
@@ -169,6 +174,71 @@ const SeriesDetails = () => {
     
     // 数字が見つからない場合は大きな値を返す（ソート時に後ろに配置）
     return 9999;
+  };
+
+  // 本のソート関数
+  const sortBooks = (books, method) => {
+    switch (method) {
+      case 'volume':
+        // 巻数でソート
+        books.sort((a, b) => {
+          const volA = extractVolumeNumber(a.title);
+          const volB = extractVolumeNumber(b.title);
+          return volA - volB;
+        });
+        break;
+      case 'title':
+        // タイトルでソート
+        books.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+        break;
+      case 'publishedDate':
+        // 出版日でソート
+        books.sort((a, b) => {
+          const dateA = a.publishedDate ? new Date(a.publishedDate) : new Date(0);
+          const dateB = b.publishedDate ? new Date(b.publishedDate) : new Date(0);
+          return dateA - dateB;
+        });
+        break;
+      case 'publishedDate-desc':
+        // 出版日の降順でソート
+        books.sort((a, b) => {
+          const dateA = a.publishedDate ? new Date(a.publishedDate) : new Date(0);
+          const dateB = b.publishedDate ? new Date(b.publishedDate) : new Date(0);
+          return dateB - dateA;
+        });
+        break;
+      case 'addedDate':
+        // 追加日でソート
+        books.sort((a, b) => {
+          const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
+          const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
+          return dateA - dateB;
+        });
+        break;
+      case 'status':
+        // 読書状態でソート (未読 -> 読書中 -> 完読)
+        books.sort((a, b) => {
+          const statusOrder = { unread: 0, reading: 1, completed: 2 };
+          return statusOrder[a.status] - statusOrder[b.status];
+        });
+        break;
+      default:
+        // デフォルトは巻数でソート
+        books.sort((a, b) => {
+          const volA = extractVolumeNumber(a.title);
+          const volB = extractVolumeNumber(b.title);
+          return volA - volB;
+        });
+    }
+  };
+
+  // ソート方法を変更したときのハンドラー
+  const handleSortChange = (method) => {
+    setSortMethod(method);
+    const sortedBooks = [...seriesBooks];
+    sortBooks(sortedBooks, method);
+    setSeriesBooks(sortedBooks);
+    setSortMenuAnchor(null);
   };
 
   // シリーズに追加可能な本を取得
@@ -238,13 +308,37 @@ const SeriesDetails = () => {
   const handleRemoveBookFromSeries = async (bookId) => {
     try {
       const seriesRef = doc(db, 'users', currentUser.uid, 'series', id);
+      
+      // 本のIDをbooks配列から削除
       await updateDoc(seriesRef, {
         books: arrayRemove(bookId),
         lastModified: new Date().toISOString().split('T')[0],
       });
       
+      // bookStatusからも該当の本を削除
+      if (series.bookStatus && series.bookStatus[bookId]) {
+        // Firestoreのオブジェクトから特定のフィールドを削除するにはFieldValueを使う必要があるが
+        // ネストされたオブジェクトの場合は全体を更新する必要がある
+        const updatedBookStatus = { ...series.bookStatus };
+        delete updatedBookStatus[bookId];
+        
+        await updateDoc(seriesRef, {
+          bookStatus: updatedBookStatus
+        });
+      }
+      
       // ステートを更新
-      const updatedSeries = { ...series, books: series.books.filter(id => id !== bookId) };
+      const updatedSeries = { 
+        ...series, 
+        books: series.books.filter(id => id !== bookId)
+      };
+      
+      if (updatedSeries.bookStatus) {
+        const newBookStatus = { ...updatedSeries.bookStatus };
+        delete newBookStatus[bookId];
+        updatedSeries.bookStatus = newBookStatus;
+      }
+      
       setSeries(updatedSeries);
       setEditedSeries(updatedSeries);
       
@@ -272,41 +366,59 @@ const SeriesDetails = () => {
       const seriesRef = doc(db, 'users', currentUser.uid, 'series', id);
       
       // 所持状態を設定（デフォルトはallOwnedパラメータによって決まる）
-      const newBooksWithStatus = {};
-      selectedBookIds.forEach(bookId => {
-        newBooksWithStatus[bookId] = { owned: allOwned };
-      });
-      
-      // 新しい本のIDと所持状態をマージ
-      const updatedBooks = { ...(series.bookStatus || {}) };
+      const bookStatus = { ...(series.bookStatus || {}) };
       
       // 新しい本の情報を追加
-      Object.entries(newBooksWithStatus).forEach(([bookId, status]) => {
-        updatedBooks[bookId] = status;
+      selectedBookIds.forEach(bookId => {
+        bookStatus[bookId] = { owned: allOwned };
       });
       
       // IDだけの配列も維持（下位互換性のため）
       const updatedBookIds = [...(series.books || []), ...selectedBookIds];
       
-      await updateDoc(seriesRef, {
+      // 更新データの準備
+      const updateData = {
         books: updatedBookIds,
-        bookStatus: updatedBooks,
+        bookStatus: bookStatus,
         lastModified: new Date().toISOString().split('T')[0],
-      });
+      };
+      
+      // コンプリート状態を自動的に更新
+      // 全巻数が設定されていて、所持している本がその数に達していればコンプリートを自動設定
+      if (series.bookCount && series.bookCount > 0) {
+        const ownedBooksCount = Object.values(bookStatus).filter(status => status.owned).length;
+        if (ownedBooksCount >= series.bookCount) {
+          updateData.completeStatus = true;
+        }
+      }
+      
+      await updateDoc(seriesRef, updateData);
       
       // ステートを更新
       const updatedSeries = { 
         ...series, 
         books: updatedBookIds,
-        bookStatus: updatedBooks
+        bookStatus: bookStatus
       };
+      
+      // コンプリート状態も更新
+      if (updateData.completeStatus !== undefined) {
+        updatedSeries.completeStatus = updateData.completeStatus;
+      }
+      
       setSeries(updatedSeries);
       setEditedSeries(updatedSeries);
       
       // 本のリストを更新するため再取得
       await fetchSeriesBooks(updatedBookIds);
       
-      setSuccessMessage('本がシリーズに追加されました');
+      // 通知メッセージを更新
+      let message = '本がシリーズに追加されました';
+      if (updateData.completeStatus) {
+        message += '。シリーズがコンプリートになりました！';
+      }
+      
+      setSuccessMessage(message);
     } catch (error) {
       console.error('Error adding books to series:', error);
       setError('本の追加中にエラーが発生しました');
@@ -321,13 +433,43 @@ const SeriesDetails = () => {
       const newStatus = !series.completeStatus;
       const seriesRef = doc(db, 'users', currentUser.uid, 'series', id);
       
+      // シリーズのコンプリート状態を更新
       await updateDoc(seriesRef, {
         completeStatus: newStatus,
         lastModified: new Date().toISOString().split('T')[0],
       });
       
+      // コンプリート状態が変更された場合、すべての本の所持状態も一括で変更
+      const bookStatus = { ...(series.bookStatus || {}) };
+      
+      // すべての本の所持状態をコンプリート状態に合わせて更新
+      let changed = false;
+      series.books.forEach(bookId => {
+        if (!bookStatus[bookId]) {
+          bookStatus[bookId] = { owned: newStatus };
+          changed = true;
+        } else if (bookStatus[bookId].owned !== newStatus) {
+          bookStatus[bookId].owned = newStatus;
+          changed = true;
+        }
+      });
+      
+      // 所持状態が変更された場合のみ更新
+      if (changed) {
+        await updateDoc(seriesRef, { bookStatus });
+        
+        // 本のリストの所持状態も更新
+        setSeriesBooks(prev => 
+          prev.map(book => ({ ...book, owned: newStatus }))
+        );
+      }
+      
       // ステートを更新
-      const updatedSeries = { ...series, completeStatus: newStatus };
+      const updatedSeries = { 
+        ...series, 
+        completeStatus: newStatus,
+        bookStatus
+      };
       setSeries(updatedSeries);
       setEditedSeries(updatedSeries);
       
@@ -397,18 +539,42 @@ const SeriesDetails = () => {
         ...(bookStatus[bookId] || {}),
         owned: newOwned 
       };
-      
-      // Firestore更新
-      await updateDoc(seriesRef, {
+
+      // 更新データを準備
+      const updateData = {
         bookStatus: bookStatus,
         lastModified: new Date().toISOString().split('T')[0],
-      });
+      };
+      
+      // 全巻数が設定されている場合、コンプリート状態を自動的に更新
+      if (series.bookCount && series.bookCount > 0) {
+        const ownedBooksCount = Object.values(bookStatus).filter(status => status.owned).length;
+        
+        // 全ての本が所持されているかチェック
+        if (ownedBooksCount >= series.bookCount) {
+          updateData.completeStatus = true;
+        } 
+        // 一冊でも未所持の本があればコンプリート解除
+        else if (series.completeStatus) {
+          updateData.completeStatus = false;
+        }
+      }
+      
+      // Firestore更新
+      await updateDoc(seriesRef, updateData);
       
       // ローカル状態も更新
-      setSeries(prev => ({
-        ...prev,
+      const updatedSeries = {
+        ...series,
         bookStatus: bookStatus
-      }));
+      };
+      
+      // コンプリート状態も更新
+      if (updateData.completeStatus !== undefined) {
+        updatedSeries.completeStatus = updateData.completeStatus;
+      }
+      
+      setSeries(updatedSeries);
       
       // 本のリストも更新
       setSeriesBooks(prev => 
@@ -419,7 +585,16 @@ const SeriesDetails = () => {
         )
       );
       
-      setSuccessMessage(newOwned ? '本を所持済みにしました' : '本を未所持にしました');
+      let message = newOwned ? '本を所持済みにしました' : '本を未所持にしました';
+      
+      // コンプリート状態が変わった場合は通知を追加
+      if (updateData.completeStatus !== undefined && updateData.completeStatus !== series.completeStatus) {
+        message += updateData.completeStatus 
+          ? '。シリーズがコンプリートになりました！' 
+          : '。シリーズが未完了になりました';
+      }
+      
+      setSuccessMessage(message);
     } catch (error) {
       console.error('本の所持状態更新エラー:', error);
       setError('本の所持状態の更新中にエラーが発生しました');
@@ -716,7 +891,7 @@ const SeriesDetails = () => {
               </Grid>
             )}
           </Paper>
-          
+
           {/* シリーズ内の本一覧 */}
           <Paper elevation={3} sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -724,13 +899,64 @@ const SeriesDetails = () => {
                 <BookIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                 シリーズ内の本
               </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenAddBookDialog(true)}
-              >
-                本を追加
-              </Button>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Button
+                  startIcon={<SortIcon />}
+                  onClick={(e) => setSortMenuAnchor(e.currentTarget)}
+                  sx={{ mr: 1 }}
+                >
+                  並び替え
+                </Button>
+                <Menu
+                  anchorEl={sortMenuAnchor}
+                  open={sortMenuOpen}
+                  onClose={() => setSortMenuAnchor(null)}
+                >
+                  <MenuItem 
+                    onClick={() => handleSortChange('volume')}
+                    selected={sortMethod === 'volume'}
+                  >
+                    巻数順
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleSortChange('title')}
+                    selected={sortMethod === 'title'}
+                  >
+                    タイトル順
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleSortChange('publishedDate')}
+                    selected={sortMethod === 'publishedDate'}
+                  >
+                    発売日順（古い順）
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleSortChange('publishedDate-desc')}
+                    selected={sortMethod === 'publishedDate-desc'}
+                  >
+                    発売日順（新しい順）
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleSortChange('addedDate')}
+                    selected={sortMethod === 'addedDate'}
+                  >
+                    追加日順
+                  </MenuItem>
+                  <MenuItem 
+                    onClick={() => handleSortChange('status')}
+                    selected={sortMethod === 'status'}
+                  >
+                    読書状態順
+                  </MenuItem>
+                </Menu>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setOpenAddBookDialog(true)}
+                >
+                  本を追加
+                </Button>
+              </Box>
             </Box>
             
             {loadingBooks ? (
@@ -836,7 +1062,7 @@ const SeriesDetails = () => {
               </List>
             )}
           </Paper>
-          
+
           {/* 削除確認ダイアログ */}
           <Dialog
             open={openDeleteDialog}
@@ -920,6 +1146,7 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredBooks, setFilteredBooks] = useState(books);
   const [allOwned, setAllOwned] = useState(true); // デフォルトで所持済みに設定
+  const [displayCount, setDisplayCount] = useState(20); // デフォルトの表示数
   
   // 検索フィルター
   useEffect(() => {
@@ -946,6 +1173,11 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
     });
   };
   
+  // 表示数を増やす
+  const loadMore = () => {
+    setDisplayCount(prev => prev + 20);
+  };
+  
   return (
     <Box>
       <TextField
@@ -964,16 +1196,32 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
         <Typography variant="subtitle2">
           追加する本を選択 ({selectedBooks.length} 選択中)
         </Typography>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={allOwned}
-              onChange={(e) => setAllOwned(e.target.checked)}
-              color="primary"
-            />
-          }
-          label="所持済みとして追加"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 120, mr: 2 }}>
+            <InputLabel id="display-count-label">表示数</InputLabel>
+            <Select
+              labelId="display-count-label"
+              value={displayCount}
+              label="表示数"
+              onChange={(e) => setDisplayCount(e.target.value)}
+            >
+              <MenuItem value={20}>20冊</MenuItem>
+              <MenuItem value={50}>50冊</MenuItem>
+              <MenuItem value={100}>100冊</MenuItem>
+              <MenuItem value={1000}>すべて</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={allOwned}
+                onChange={(e) => setAllOwned(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="所持済みとして追加"
+          />
+        </Box>
       </Box>
       
       <List sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
@@ -982,7 +1230,7 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
             <ListItemText primary="条件に一致する本はありません" />
           </ListItem>
         ) : (
-          filteredBooks.map((book) => (
+          filteredBooks.slice(0, displayCount).map((book) => (
             <React.Fragment key={book.id}>
               <ListItem
                 button
@@ -1013,6 +1261,12 @@ const AddBooksToSeries = ({ books, onAdd, onCancel }) => {
           ))
         )}
       </List>
+      
+      {filteredBooks.length > displayCount && (
+        <Box sx={{ textAlign: 'center', mt: 1 }}>
+          <Button onClick={loadMore}>さらに表示</Button>
+        </Box>
+      )}
       
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
         <Button onClick={onCancel} sx={{ mr: 1 }}>

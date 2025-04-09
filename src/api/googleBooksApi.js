@@ -35,16 +35,31 @@ export const fetchBookByISBN = async (isbn) => {
  */
 export const searchBooksByTitle = async (title, maxResults = 10, orderBy = 'newest') => {
   try {
+    // 最大表示数を制限する（Google API制限が40）
+    const actualMaxResults = Math.min(maxResults, 40);
+    
     const response = await fetch(
-      `${API_BASE_URL}/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=${maxResults}&orderBy=${orderBy}`
+      `${API_BASE_URL}/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=${actualMaxResults}&orderBy=${orderBy}&langRestrict=ja`
     );
     const data = await response.json();
     
-    if (data.totalItems === 0) {
+    if (!data.items || data.totalItems === 0) {
       return []; // 本が見つからない場合
     }
     
-    return data.items.map(processBookData);
+    // ソート順を適用
+    const results = data.items.map(processBookData);
+    
+    if (orderBy === 'newest') {
+      // 発売日順にソート（新しい順）
+      results.sort((a, b) => {
+        const dateA = a.publishedDate ? new Date(a.publishedDate) : new Date(0);
+        const dateB = b.publishedDate ? new Date(b.publishedDate) : new Date(0);
+        return dateB - dateA; // 降順（新しい順）
+      });
+    }
+    
+    return results;
   } catch (error) {
     console.error('Google Books API呼び出しエラー:', error);
     throw error;
@@ -60,16 +75,31 @@ export const searchBooksByTitle = async (title, maxResults = 10, orderBy = 'newe
  */
 export const searchBooksByAuthor = async (author, maxResults = 10, orderBy = 'newest') => {
   try {
+    // 最大表示数を制限する（Google API制限が40）
+    const actualMaxResults = Math.min(maxResults, 40);
+    
     const response = await fetch(
-      `${API_BASE_URL}/volumes?q=inauthor:${encodeURIComponent(author)}&maxResults=${maxResults}&orderBy=${orderBy}`
+      `${API_BASE_URL}/volumes?q=inauthor:${encodeURIComponent(author)}&maxResults=${actualMaxResults}&orderBy=${orderBy}&langRestrict=ja`
     );
     const data = await response.json();
     
-    if (data.totalItems === 0) {
+    if (!data.items || data.totalItems === 0) {
       return []; // 本が見つからない場合
     }
     
-    return data.items.map(processBookData);
+    // ソート順を適用
+    const results = data.items.map(processBookData);
+    
+    if (orderBy === 'newest') {
+      // 発売日順にソート（新しい順）
+      results.sort((a, b) => {
+        const dateA = a.publishedDate ? new Date(a.publishedDate) : new Date(0);
+        const dateB = b.publishedDate ? new Date(b.publishedDate) : new Date(0);
+        return dateB - dateA; // 降順（新しい順）
+      });
+    }
+    
+    return results;
   } catch (error) {
     console.error('Google Books API呼び出しエラー:', error);
     throw error;
@@ -116,20 +146,32 @@ export const advancedBookSearch = async (params) => {
   }
   
   const queryString = query.join('+');
-  const maxResults = params.maxResults || 10;
+  const maxResults = Math.min(params.maxResults || 10, 40); // 最大表示数を制限
   const orderBy = params.orderBy || 'newest';
   
   try {
     const response = await fetch(
-      `${API_BASE_URL}/volumes?q=${queryString}&maxResults=${maxResults}&orderBy=${orderBy}`
+      `${API_BASE_URL}/volumes?q=${queryString}&maxResults=${maxResults}&orderBy=${orderBy}&langRestrict=ja`
     );
     const data = await response.json();
     
-    if (data.totalItems === 0) {
+    if (!data.items || data.totalItems === 0) {
       return [];
     }
     
-    return data.items.map(processBookData);
+    // ソート順を適用
+    const results = data.items.map(processBookData);
+    
+    if (orderBy === 'newest') {
+      // 発売日順にソート（新しい順）
+      results.sort((a, b) => {
+        const dateA = a.publishedDate ? new Date(a.publishedDate) : new Date(0);
+        const dateB = b.publishedDate ? new Date(b.publishedDate) : new Date(0);
+        return dateB - dateA; // 降順（新しい順）
+      });
+    }
+    
+    return results;
   } catch (error) {
     console.error('Google Books API呼び出しエラー:', error);
     throw error;
