@@ -1,6 +1,6 @@
 // src/api/rakutenBooksApi.js
-const API_BASE_URL = 'https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404?';
-const APP_ID = '1089567647677422356'; // 取得したIDをここに入力
+const API_BASE_URL = 'https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404';
+const APP_ID = process.env.REACT_APP_RAKUTEN_APP_ID || '1089567647677422356';
 
 /**
  * タイトルで本を検索する
@@ -11,11 +11,32 @@ const APP_ID = '1089567647677422356'; // 取得したIDをここに入力
  */
 export const searchBooksByTitle = async (title, maxResults = 20, sortOrder = 'standard') => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}?applicationId=${APP_ID}&title=${encodeURIComponent(title)}&hits=${maxResults}&sort=${sortOrder}`
-    );
+    // sortOrderの変換ロジック
+    let validSortOrder;
+    switch (sortOrder) {
+      case 'newest':
+      case 'releaseDate':
+        validSortOrder = '-releaseDate'; // マイナス記号で降順（新しい順）
+        break;
+      case 'relevance':
+        validSortOrder = 'standard';
+        break;
+      default:
+        validSortOrder = 'standard';
+    }
+    
+    const url = `${API_BASE_URL}?applicationId=${APP_ID}&title=${encodeURIComponent(title)}&hits=${maxResults}&sort=${validSortOrder}`;
+    console.log('Rakuten API request URL:', url);
+    
+    const response = await fetch(url);
+    console.log('Rakuten API response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Rakuten API returned ${response.status}: ${response.statusText}`);
+    }
     
     const data = await response.json();
+    console.log('Rakuten API response data:', data);
     
     if (!data.Items || data.Items.length === 0) {
       return [];
