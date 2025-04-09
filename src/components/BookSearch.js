@@ -1,5 +1,5 @@
 // src/components/BookSearch.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -27,19 +27,15 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Chip
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Clear as ClearIcon,
   Sort as SortIcon
 } from '@mui/icons-material';
-import {
-  searchBooksByTitle,
-  searchBooksByAuthor,
-  fetchBookByISBN,
-  API_SOURCES
-} from '../api/bookApiClient';
+import { searchBooksByTitle, searchBooksByAuthor, fetchBookByISBN, ApiSource } from '../api/bookApiClient';
 
 // タブパネル用のコンポーネント
 function TabPanel(props) {
@@ -71,8 +67,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sortOrder, setSortOrder] = useState('newest'); // デフォルトで発売順
-  const [maxResults, setMaxResults] = useState(20); // デフォルトの検索結果数
-  const [apiSource, setApiSource] = useState(API_SOURCES.GOOGLE_BOOKS); // デフォルトAPIソース
+  const [apiSource, setApiSource] = useState(ApiSource.BOTH); // API選択のための状態
 
   // タブ変更ハンドラ
   const handleTabChange = (event, newValue) => {
@@ -84,11 +79,6 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
   // ソート順変更ハンドラ
   const handleSortChange = (event) => {
     setSortOrder(event.target.value);
-  };
-
-  // 検索結果数変更ハンドラ
-  const handleMaxResultsChange = (event) => {
-    setMaxResults(event.target.value);
   };
 
   // APIソース変更ハンドラ
@@ -107,7 +97,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
-      const results = await searchBooksByTitle(titleSearch, maxResults, sortOrder, apiSource);
+      const results = await searchBooksByTitle(titleSearch, 20, sortOrder, apiSource);
       setSearchResults(results);
       
       if (results.length === 0) {
@@ -132,7 +122,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
-      const results = await searchBooksByAuthor(authorSearch, maxResults, sortOrder, apiSource);
+      const results = await searchBooksByAuthor(authorSearch, 20, sortOrder, apiSource);
       setSearchResults(results);
       
       if (results.length === 0) {
@@ -157,6 +147,7 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
     setError('');
     
     try {
+      // 両方のAPIソースから検索（ISBNは一意なので両方から検索しても問題ない）
       const result = await fetchBookByISBN(isbnSearch, apiSource);
       
       if (result) {
@@ -237,37 +228,22 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
           <Tab label="ISBNで検索" />
         </Tabs>
 
-        {/* 検索オプション */}
+        {/* APIソース選択 */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
           <FormControl size="small" sx={{ minWidth: 150, mr: 2 }}>
-            <InputLabel id="api-source-label">検索API</InputLabel>
+            <InputLabel id="api-source-label">検索ソース</InputLabel>
             <Select
               labelId="api-source-label"
               value={apiSource}
-              label="検索API"
+              label="検索ソース"
               onChange={handleApiSourceChange}
             >
-              <MenuItem value={API_SOURCES.GOOGLE_BOOKS}>Google Books</MenuItem>
-              <MenuItem value={API_SOURCES.NDL}>国会図書館</MenuItem>
-              <MenuItem value={API_SOURCES.ALL}>全てのAPI</MenuItem>
+              <MenuItem value={ApiSource.BOTH}>両方</MenuItem>
+              <MenuItem value={ApiSource.GOOGLE_BOOKS}>Google Books</MenuItem>
+              <MenuItem value={ApiSource.RAKUTEN_BOOKS}>楽天ブックス</MenuItem>
             </Select>
           </FormControl>
-          
-          <FormControl size="small" sx={{ minWidth: 120, mr: 2 }}>
-            <InputLabel id="max-results-label">表示件数</InputLabel>
-            <Select
-              labelId="max-results-label"
-              value={maxResults}
-              label="表示件数"
-              onChange={handleMaxResultsChange}
-              disabled={tabValue === 2} // ISBN検索では表示件数無効
-            >
-              <MenuItem value={20}>20件</MenuItem>
-              <MenuItem value={30}>30件</MenuItem>
-              <MenuItem value={40}>40件</MenuItem>
-            </Select>
-          </FormControl>
-          
+
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel id="sort-order-label">並び順</InputLabel>
             <Select
@@ -425,11 +401,17 @@ const BookSearch = ({ open, onClose, onSelectBook }) => {
                             <Typography variant="body2" color="text.secondary" gutterBottom>
                               出版社: {book.publisher || '不明'} 
                               {book.publishedDate && ` (${formatPublishedDate(book.publishedDate)})`}
-                              {book.apiSource && ` - ${book.apiSource === API_SOURCES.GOOGLE_BOOKS ? 'Google Books' : '国会図書館'}`}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" gutterBottom>
                               ISBN: {book.isbn13 || book.isbn10 || '不明'}
                             </Typography>
+                            {/* APIソースを表示 */}
+                            <Chip 
+                              size="small" 
+                              label={book.apiSource === 'google' ? 'Google' : '楽天'} 
+                              color={book.apiSource === 'google' ? 'primary' : 'secondary'}
+                              sx={{ mt: 0.5, mb: 1, fontSize: '0.7rem' }}
+                            />
                             {book.description && (
                               <Typography
                                 variant="body2"

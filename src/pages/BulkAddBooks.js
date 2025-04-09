@@ -14,11 +14,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  searchBooksByTitle, 
-  searchBooksByAuthor, 
-  API_SOURCES 
-} from '../api/bookApiClient';
+import { searchBooksByTitle, searchBooksByAuthor, ApiSource } from '../api/bookApiClient';
 
 // Material-UI
 import {
@@ -96,8 +92,7 @@ const BulkAddBooks = () => {
   const [newSeriesTitle, setNewSeriesTitle] = useState('');
   const [defaultStatus, setDefaultStatus] = useState('unread');
   const [sortOrder, setSortOrder] = useState('newest'); // デフォルトで発売順
-  const [displayLimit, setDisplayLimit] = useState(20); // デフォルト表示数
-  const [apiSource, setApiSource] = useState(API_SOURCES.GOOGLE_BOOKS); // デフォルトAPIソース
+  const [apiSource, setApiSource] = useState(ApiSource.BOTH); // APIソースの状態を追加
 
   // シリーズ一覧を取得
   useEffect(() => {
@@ -126,17 +121,12 @@ const BulkAddBooks = () => {
   // ステップの定義
   const steps = ['本を検索', '詳細設定', '確認と保存'];
 
-  // sortOrderの状態変更ハンドラ
+  // sortOrderの状態変更ハンドラを追加
   const handleSortOrderChange = (e) => {
     setSortOrder(e.target.value);
   };
 
-  // 表示数変更ハンドラ
-  const handleDisplayLimitChange = (e) => {
-    setDisplayLimit(Number(e.target.value));
-  };
-
-  // APIソース変更ハンドラ
+  // APIソース変更ハンドラの追加
   const handleApiSourceChange = (e) => {
     setApiSource(e.target.value);
   };
@@ -155,9 +145,9 @@ const BulkAddBooks = () => {
       let results;
       
       if (searchType === 'title') {
-        results = await searchBooksByTitle(searchTerm, displayLimit, sortOrder, apiSource);
+        results = await searchBooksByTitle(searchTerm, 20, sortOrder, apiSource);
       } else {
-        results = await searchBooksByAuthor(searchTerm, displayLimit, sortOrder, apiSource);
+        results = await searchBooksByAuthor(searchTerm, 20, sortOrder, apiSource);
       }
       
       setSearchResults(results);
@@ -299,6 +289,7 @@ const BulkAddBooks = () => {
           addedDate: today,
           lastModified: today,
           createdAt: serverTimestamp(),
+          apiSource: book.apiSource || 'google', // APIソースも保存
         };
         
         const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'books'), bookData);
@@ -312,38 +303,12 @@ const BulkAddBooks = () => {
         const seriesSnap = await getDoc(seriesRef);
         
         if (seriesSnap.exists()) {
-          const seriesData = seriesSnap.data();
-          const currentBooks = seriesData.books || [];
-          const bookStatus = seriesData.bookStatus || {};
+          const currentBooks = seriesSnap.data().books || [];
           
-          // 新しい本の所持状態をデフォルトで所持済みに設定
-          bookIds.forEach(bookId => {
-            bookStatus[bookId] = { owned: true };
-          });
-          
-          // 更新データを準備
-          const updateData = {
+          await updateDoc(seriesRef, {
             books: [...currentBooks, ...bookIds],
-            bookStatus: bookStatus,
             lastModified: today
-          };
-          
-          // シリーズの全巻数が設定されている場合、コンプリート状態を自動更新
-          if (seriesData.bookCount && seriesData.bookCount > 0) {
-            const totalOwnedBooks = Object.values(bookStatus).filter(status => status.owned).length;
-            
-            // 所持している本が全巻数以上ならコンプリート状態に
-            if (totalOwnedBooks >= seriesData.bookCount) {
-              updateData.completeStatus = true;
-            }
-          }
-          
-          // 新規シリーズを作成した場合は自動的に全ての本をコンプリート済みに
-          if (createNewSeries && bookIds.length >= selectedBooks.length) {
-            updateData.completeStatus = true;
-          }
-          
-          await updateDoc(seriesRef, updateData);
+          });
         }
       }
       
@@ -442,50 +407,32 @@ const BulkAddBooks = () => {
                 </Grid>
                 <Grid item xs={12} sm={2}>
                   <FormControl fullWidth>
-                    <InputLabel>検索API</InputLabel>
+                    <InputLabel>検索ソース</InputLabel>
                     <Select
                       value={apiSource}
-                      label="検索API"
+                      label="検索ソース"
                       onChange={handleApiSourceChange}
                     >
-                      <MenuItem value={API_SOURCES.GOOGLE_BOOKS}>Google Books</MenuItem>
-                      <MenuItem value={API_SOURCES.NDL}>国会図書館</MenuItem>
-                      <MenuItem value={API_SOURCES.ALL}>全てのAPI</MenuItem>
+                      <MenuItem value={ApiSource.BOTH}>両方</MenuItem>
+                      <MenuItem value={ApiSource.GOOGLE_BOOKS}>Google Books</MenuItem>
+                      <MenuItem value={ApiSource.RAKUTEN_BOOKS}>楽天ブックス</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={2}>
-                  <FormControl fullWidth>
-                    <InputLabel>表示件数</InputLabel>
-                    <Select
-                      value={displayLimit}
-                      label="表示件数"
-                      onChange={handleDisplayLimitChange}
-                    >
-                      <MenuItem value={20}>20件</MenuItem>
-                      <MenuItem value={30}>30件</MenuItem>
-                      <MenuItem value={40}>40件</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-
-              <Grid container spacing={2} alignItems="center" sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={4}>
+                <Grid item xs={12} sm={1}>
                   <FormControl fullWidth>
                     <InputLabel>並び順</InputLabel>
                     <Select
                       value={sortOrder}
                       label="並び順"
                       onChange={handleSortOrderChange}
-                      startAdornment={<SortIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />}
                     >
                       <MenuItem value="newest">発売日順</MenuItem>
                       <MenuItem value="relevance">関連度順</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={2}>
+                <Grid item xs={12} sm={1}>
                   <Button
                     variant="contained"
                     onClick={handleSearch}
@@ -545,10 +492,13 @@ const BulkAddBooks = () => {
                                 出版: {book.publishedDate}
                               </Typography>
                             )}
-                            <Typography variant="caption" color="text.secondary" display="block">
-                              {book.apiSource === API_SOURCES.GOOGLE_BOOKS ? 'Google Books' : 
-                              book.apiSource === API_SOURCES.NDL ? '国会図書館' : ''}
-                            </Typography>
+                            {/* APIソースを表示 */}
+                            <Chip 
+                              size="small" 
+                              label={book.apiSource === 'google' ? 'Google' : '楽天'} 
+                              color={book.apiSource === 'google' ? 'primary' : 'secondary'}
+                              sx={{ mt: 1, fontSize: '0.7rem' }}
+                            />
                           </CardContent>
                           <Box sx={{ p: 1, pt: 0 }}>
                             <Button
@@ -680,6 +630,13 @@ const BulkAddBooks = () => {
                             <Typography variant="body2" color="text.secondary">
                               {book.authors?.join(', ') || '著者不明'}
                             </Typography>
+                            {/* APIソース表示を追加 */}
+                            <Chip 
+                              size="small" 
+                              label={book.apiSource === 'google' ? 'Google' : '楽天'} 
+                              color={book.apiSource === 'google' ? 'primary' : 'secondary'}
+                              sx={{ mt: 0.5, fontSize: '0.7rem' }}
+                            />
                           </Grid>
                           <Grid item xs={12} sm={4}>
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -717,152 +674,159 @@ const BulkAddBooks = () => {
                           onChange={(e) => handleNotesChange(book.id, e.target.value)}
                           variant="outlined"
                           size="small"
-                        />
-                      </AccordionDetails>
-                    </Accordion>
-                  </React.Fragment>
-                ))}
-              </List>
-            </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-              <Button
-                onClick={handleBack}
-              >
-                戻る
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleNext}
-                disabled={selectedBooks.length === 0}
-              >
-                次へ
-              </Button>
-            </Box>
-          </>
-        )}
-
-        {/* ステップ3: 確認と保存 */}
-        {activeStep === 2 && (
-          <>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" gutterBottom>
-                登録内容の確認
-              </Typography>
-              
-              <Paper variant="outlined" sx={{ p: 3 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      登録する本
-                    </Typography>
-                    <Typography variant="h4" color="primary">
-                      {selectedBooks.length}冊
-                    </Typography>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      基本設定
-                    </Typography>
-                    <Typography variant="body1">
-                      デフォルトステータス: {
-                        {
-                          'unread': '未読',
-                          'reading': '読書中',
-                          'completed': '完読'
-                        }[defaultStatus]
-                      }
-                    </Typography>
-                    
-                    {createNewSeries ? (
-                      <Typography variant="body1">
-                        新しいシリーズ: {newSeriesTitle}
-                      </Typography>
-                    ) : selectedSeries ? (
-                      <Typography variant="body1">
-                        追加先シリーズ: {allSeries.find(s => s.id === selectedSeries)?.title || '不明'}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body1">
-                        シリーズ: 追加しない
-                      </Typography>
-                    )}
-                  </Grid>
-                </Grid>
-                
-                <Divider sx={{ my: 2 }} />
-                
-                <Typography variant="subtitle1" gutterBottom>
-                  登録する本のリスト
-                </Typography>
-                
-                <List sx={{ bgcolor: 'background.paper', maxHeight: 300, overflow: 'auto' }}>
-                  {selectedBooks.map((book, index) => (
-                    <React.Fragment key={book.id}>
-                      <ListItem>
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item xs={12} sm={8}>
-                            <Typography variant="body1">{book.title}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {book.authors?.join(', ') || '著者不明'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} sm={4}>
-                            <Chip
-                              label={{
-                                unread: '未読',
-                                reading: '読書中',
-                                completed: '完読'
-                              }[book.status] || '未設定'}
-                              size="small"
-                              color={{
-                                unread: 'error',
-                                reading: 'warning',
-                                completed: 'success'
-                              }[book.status] || 'default'}
-                            />
-                          </Grid>
-                        </Grid>
-                      </ListItem>
-                      {index < selectedBooks.length - 1 && <Divider />}
+                          />
+                        </AccordionDetails>
+                      </Accordion>
                     </React.Fragment>
                   ))}
                 </List>
-              </Paper>
-            </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-              <Button
-                onClick={handleBack}
-              >
-                戻る
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSubmit}
-                disabled={loading || selectedBooks.length === 0}
-              >
-                {loading ? <CircularProgress size={24} /> : '登録する'}
-              </Button>
-            </Box>
-          </>
-        )}
-      </Paper>
-      
-      {/* 成功メッセージ */}
-      <Snackbar
-        open={success}
-        autoHideDuration={3000}
-        onClose={() => setSuccess(false)}
-      >
-        <Alert severity="success" sx={{ width: '100%' }}>
-          {successCount}冊の本を登録しました
-        </Alert>
-      </Snackbar>
-    </Container>
-  );
-};
-
-export default BulkAddBooks;
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+                <Button
+                  onClick={handleBack}
+                >
+                  戻る
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  disabled={selectedBooks.length === 0}
+                >
+                  次へ
+                </Button>
+              </Box>
+            </>
+          )}
+  
+          {/* ステップ3: 確認と保存 */}
+          {activeStep === 2 && (
+            <>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h6" gutterBottom>
+                  登録内容の確認
+                </Typography>
+                
+                <Paper variant="outlined" sx={{ p: 3 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        登録する本
+                      </Typography>
+                      <Typography variant="h4" color="primary">
+                        {selectedBooks.length}冊
+                      </Typography>
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="subtitle1" gutterBottom>
+                        基本設定
+                      </Typography>
+                      <Typography variant="body1">
+                        デフォルトステータス: {
+                          {
+                            'unread': '未読',
+                            'reading': '読書中',
+                            'completed': '完読'
+                          }[defaultStatus]
+                        }
+                      </Typography>
+                      
+                      {createNewSeries ? (
+                        <Typography variant="body1">
+                          新しいシリーズ: {newSeriesTitle}
+                        </Typography>
+                      ) : selectedSeries ? (
+                        <Typography variant="body1">
+                          追加先シリーズ: {allSeries.find(s => s.id === selectedSeries)?.title || '不明'}
+                        </Typography>
+                      ) : (
+                        <Typography variant="body1">
+                          シリーズ: 追加しない
+                        </Typography>
+                      )}
+                    </Grid>
+                  </Grid>
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Typography variant="subtitle1" gutterBottom>
+                    登録する本のリスト
+                  </Typography>
+                  
+                  <List sx={{ bgcolor: 'background.paper', maxHeight: 300, overflow: 'auto' }}>
+                    {selectedBooks.map((book, index) => (
+                      <React.Fragment key={book.id}>
+                        <ListItem>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={8}>
+                              <Typography variant="body1">{book.title}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {book.authors?.join(', ') || '著者不明'}
+                              </Typography>
+                              {/* APIソースを表示 */}
+                              <Chip 
+                                size="small" 
+                                label={book.apiSource === 'google' ? 'Google' : '楽天'} 
+                                color={book.apiSource === 'google' ? 'primary' : 'secondary'}
+                                sx={{ mt: 0.5, fontSize: '0.7rem' }}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <Chip
+                                label={{
+                                  unread: '未読',
+                                  reading: '読書中',
+                                  completed: '完読'
+                                }[book.status] || '未設定'}
+                                size="small"
+                                color={{
+                                  unread: 'error',
+                                  reading: 'warning',
+                                  completed: 'success'
+                                }[book.status] || 'default'}
+                              />
+                            </Grid>
+                          </Grid>
+                        </ListItem>
+                        {index < selectedBooks.length - 1 && <Divider />}
+                      </React.Fragment>
+                    ))}
+                  </List>
+                </Paper>
+              </Box>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+                <Button
+                  onClick={handleBack}
+                >
+                  戻る
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSubmit}
+                  disabled={loading || selectedBooks.length === 0}
+                >
+                  {loading ? <CircularProgress size={24} /> : '登録する'}
+                </Button>
+              </Box>
+            </>
+          )}
+        </Paper>
+        
+        {/* 成功メッセージ */}
+        <Snackbar
+          open={success}
+          autoHideDuration={3000}
+          onClose={() => setSuccess(false)}
+        >
+          <Alert severity="success" sx={{ width: '100%' }}>
+            {successCount}冊の本を登録しました
+          </Alert>
+        </Snackbar>
+      </Container>
+    );
+  };
+  
+  export default BulkAddBooks;
