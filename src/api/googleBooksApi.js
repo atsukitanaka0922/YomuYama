@@ -2,7 +2,7 @@
 /**
  * Google Books APIを利用して本の情報を取得するモジュール
  */
-const API_KEY = "AIzaSyBTbSN1fWg_3UYg1Rr1TZozTluDqTBgwcw";
+const API_KEY = "";
 const API_BASE_URL = 'https://www.googleapis.com/books/v1';
 
 /**
